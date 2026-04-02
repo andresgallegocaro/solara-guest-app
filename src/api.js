@@ -116,6 +116,7 @@ export async function askConcierge(messages, reservation) {
       'Content-Type': 'application/json',
       'x-api-key': CONFIG.anthropicApiKey,
       'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'mcp-client-2025-04-04',
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
@@ -138,3 +139,4 @@ Para emergencias: +57 304 616 0294 · hola@solarahomes.com.co`,
   const data = await res.json()
   return data.content?.[0]?.text || 'Contáctanos al +57 304 616 0294 🙏'
 }
+Fix concierge API headers
