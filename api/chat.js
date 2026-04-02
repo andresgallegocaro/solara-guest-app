@@ -1,0 +1,43 @@
+// Vercel Function — se ejecuta en el servidor, sin problemas de CORS
+export default async function handler(req, res) {
+  // Solo aceptar POST
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  // Headers CORS para que el navegador pueda llamar a esta función
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  try {
+    const { system, messages, maxTokens = 600 } = req.body
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.VITE_ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: maxTokens,
+        system,
+        messages,
+      }),
+    })
+
+    if (!response.ok) {
+      const err = await response.text()
+      return res.status(response.status).json({ error: err })
+    }
+
+    const data = await response.json()
+    const text = data.content?.[0]?.text || ''
+    return res.status(200).json({ text })
+
+  } catch (error) {
+    return res.status(500).json({ error: error.message })
+  }
+}
