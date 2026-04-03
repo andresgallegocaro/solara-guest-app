@@ -3,13 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import { C, DEMO_RESERVATIONS, STATUS_META } from '../config'
 import { logCheckinToNotion, logServicesToNotion, askConcierge } from '../api'
 
-const CHECKIN_STEPS = [
-  { icon: '👤', title: 'Datos personales', desc: 'Nombre, DNI / pasaporte' },
-  { icon: '📋', title: 'Aceptación de términos', desc: 'Políticas y normas del loft' },
-  { icon: '🔑', title: 'Llave digital', desc: 'Código de acceso al inmueble' },
-  { icon: '🗺️', title: 'Instrucciones de llegada', desc: 'Guía paso a paso' },
-]
-
 const UPSELLS = [
   { id: 1, icon: '🧘', title: 'Sesión de Yoga', desc: 'Mañana privada en terraza', price: '80.000 COP', tag: 'Popular' },
   { id: 2, icon: '🍾', title: 'Pack Bienvenida', desc: 'Vino + flores + snacks artesanales', price: '120.000 COP', tag: 'Romántico' },
@@ -37,6 +30,54 @@ const NAV = [
   { id: 'chat', icon: '💬', label: 'Concierge' },
 ]
 
+const TYC_TEXT = `TÉRMINOS Y CONDICIONES — SOLARA HOMES S.A.S.
+
+1. ACEPTACIÓN
+Al completar el check-in, el huésped acepta íntegramente estos Términos y Condiciones. Esta aceptación tiene carácter vinculante bajo la legislación colombiana.
+
+2. USO DEL INMUEBLE
+El inmueble se arrienda exclusivamente para uso residencial temporal vacacional o turístico. Queda expresamente prohibido:
+• Fiestas o eventos con personas distintas a los huéspedes registrados
+• Actividades comerciales de cualquier naturaleza
+• Turismo sexual o cualquier actividad ilícita
+• Reuniones que excedan la capacidad máxima del inmueble
+
+3. CAPACIDAD MÁXIMA
+Solo pueden pernoctar las personas registradas en la reserva. No se admiten visitantes nocturnos (22:00h – 08:00h) sin autorización previa.
+
+4. HORARIOS
+• Check-in: desde las 15:00h
+• Check-out: hasta las 11:00h
+• Silencio: 22:00h – 08:00h
+
+5. MASCOTAS Y TABACO
+No se permite fumar en el interior (incluido balcón). Las mascotas requieren autorización previa y depósito adicional de COP 200.000.
+
+6. CUIDADO DEL INMUEBLE
+El huésped se compromete a entregar el inmueble en el mismo estado en que lo recibió. Cualquier daño será cobrado a valor de reposición + 20% de penalización.
+
+7. CANCELACIONES
+• Más de 7 días: reembolso del 80%
+• 3–7 días: reembolso del 50%
+• Menos de 72h: sin reembolso
+• No-show: sin reembolso
+
+8. PRIVACIDAD
+Los datos del huésped se tratan conforme a la Ley 1581 de 2012 (Habeas Data Colombia) y se usan exclusivamente para la gestión de la reserva.
+
+TABLA DE MULTAS Y PENALIZACIONES:
+• Fiesta o evento no autorizado: USD 1.000
+• Superar capacidad máxima: COP 500.000/persona adicional
+• Fumar en el interior: COP 300.000 + limpieza especializada
+• Consumo de sustancias ilegales: USD 1.000 + denuncia
+• Daños a muebles o equipamiento: valor de reposición + 20%
+• Incumplimiento horario de silencio (reincidencia): COP 200.000/noche
+• Check-out tardío sin autorización: COP 100.000/hora
+• Mascota no autorizada: COP 300.000
+• Pérdida de código de acceso: COP 100.000
+
+Al aceptar, declaro haber leído y comprendido íntegramente estos Términos y Condiciones.`
+
 function Badge({ status }) {
   const m = STATUS_META[status] || STATUS_META['Confirmada']
   return (
@@ -47,15 +88,212 @@ function Badge({ status }) {
   )
 }
 
+// ── PASO 1: Formulario de datos personales ────────────────────────────────
+function StepDatos({ onComplete }) {
+  const [form, setForm] = useState({
+    nombre: '', apellido: '', tipoDoc: 'Cédula', numDoc: '',
+    nacionalidad: '', fechaNac: '', email: '', telefono: '',
+  })
+  const f = k => v => setForm(p => ({ ...p, [k]: v }))
+  const valid = form.nombre && form.apellido && form.numDoc && form.email
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>
+        Esta información es requerida por ley colombiana para alojamientos turísticos (Decreto 2590/2009).
+      </div>
+
+      {[
+        { label: 'Nombre *', key: 'nombre', placeholder: 'Ej. Carlos' },
+        { label: 'Apellido(s) *', key: 'apellido', placeholder: 'Ej. Méndez García' },
+      ].map(({ label, key, placeholder }) => (
+        <div key={key} style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 4 }}>{label}</label>
+          <input value={form[key]} onChange={e => f(key)(e.target.value)} placeholder={placeholder}
+            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${C.light}`, borderRadius: 8, fontSize: 13, outline: 'none', background: C.white, fontFamily: 'Georgia,serif', color: C.text, boxSizing: 'border-box' }} />
+        </div>
+      ))}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+        <div>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 4 }}>TIPO DOCUMENTO *</label>
+          <select value={form.tipoDoc} onChange={e => f('tipoDoc')(e.target.value)}
+            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${C.light}`, borderRadius: 8, fontSize: 13, outline: 'none', background: C.white, fontFamily: 'Georgia,serif', color: C.text, boxSizing: 'border-box' }}>
+            {['Cédula', 'Pasaporte', 'Cédula Extranjería', 'DNI', 'Otro'].map(o => <option key={o}>{o}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 4 }}>NÚMERO *</label>
+          <input value={form.numDoc} onChange={e => f('numDoc')(e.target.value)} placeholder="123456789"
+            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${C.light}`, borderRadius: 8, fontSize: 13, outline: 'none', background: C.white, fontFamily: 'Georgia,serif', color: C.text, boxSizing: 'border-box' }} />
+        </div>
+      </div>
+
+      {[
+        { label: 'Nacionalidad', key: 'nacionalidad', placeholder: 'Ej. Colombiana' },
+        { label: 'Fecha de nacimiento', key: 'fechaNac', placeholder: 'DD/MM/AAAA', type: 'text' },
+        { label: 'Email *', key: 'email', placeholder: 'correo@ejemplo.com', type: 'email' },
+        { label: 'Teléfono / WhatsApp', key: 'telefono', placeholder: '+57 300 000 0000' },
+      ].map(({ label, key, placeholder, type = 'text' }) => (
+        <div key={key} style={{ marginBottom: 12 }}>
+          <label style={{ display: 'block', fontSize: 10, color: C.muted, letterSpacing: 1, marginBottom: 4 }}>{label.toUpperCase()}</label>
+          <input type={type} value={form[key]} onChange={e => f(key)(e.target.value)} placeholder={placeholder}
+            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${C.light}`, borderRadius: 8, fontSize: 13, outline: 'none', background: C.white, fontFamily: 'Georgia,serif', color: C.text, boxSizing: 'border-box' }} />
+        </div>
+      ))}
+
+      <button onClick={() => valid && onComplete(form)} disabled={!valid}
+        style={{ width: '100%', background: valid ? C.dark : C.light, color: C.cream, border: 'none', borderRadius: 10, padding: '14px', cursor: valid ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600, marginTop: 4 }}>
+        Continuar →
+      </button>
+      {!valid && <div style={{ fontSize: 11, color: C.muted, textAlign: 'center', marginTop: 8 }}>Completa los campos obligatorios (*)</div>}
+    </div>
+  )
+}
+
+// ── PASO 2: Términos y condiciones legibles ───────────────────────────────
+function StepTyC({ onComplete }) {
+  const [read, setRead] = useState(false)
+  const [accepted, setAccepted] = useState(false)
+  const scrollRef = useRef(null)
+
+  const handleScroll = (e) => {
+    const el = e.target
+    if (el.scrollHeight - el.scrollTop <= el.clientHeight + 40) setRead(true)
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
+        Lee los términos completos antes de aceptar. Desplázate hasta el final para activar la aceptación.
+      </div>
+
+      <div ref={scrollRef} onScroll={handleScroll}
+        style={{ background: C.white, border: `1px solid ${C.light}`, borderRadius: 10, padding: '14px 16px', maxHeight: 280, overflowY: 'auto', fontSize: 12, lineHeight: 1.7, color: C.text, whiteSpace: 'pre-line', marginBottom: 14 }}>
+        {TYC_TEXT}
+        <div style={{ height: 20 }} />
+        <div style={{ textAlign: 'center', color: C.muted, fontSize: 11 }}>— Fin de los Términos y Condiciones —</div>
+      </div>
+
+      {!read && (
+        <div style={{ background: '#fff3cd', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#856404', marginBottom: 12, textAlign: 'center' }}>
+          ↓ Desplázate hasta el final para poder aceptar
+        </div>
+      )}
+
+      {read && (
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16, cursor: 'pointer' }}>
+          <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)}
+            style={{ width: 18, height: 18, marginTop: 2, cursor: 'pointer', accentColor: C.dark }} />
+          <span style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+            He leído y acepto íntegramente los Términos y Condiciones de SOLARA Homes S.A.S., incluyendo la tabla de multas y penalizaciones.
+          </span>
+        </label>
+      )}
+
+      <button onClick={() => accepted && onComplete()} disabled={!accepted}
+        style={{ width: '100%', background: accepted ? C.dark : C.light, color: C.cream, border: 'none', borderRadius: 10, padding: '14px', cursor: accepted ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600 }}>
+        Acepto los Términos y Condiciones →
+      </button>
+    </div>
+  )
+}
+
+// ── PASO 4: Instrucciones de llegada ─────────────────────────────────────
+function StepInstrucciones({ res, onComplete }) {
+  const [read, setRead] = useState(false)
+
+  const handleScroll = (e) => {
+    const el = e.target
+    if (el.scrollHeight - el.scrollTop <= el.clientHeight + 40) setRead(true)
+  }
+
+  const instrucciones = `📍 DIRECCIÓN
+${res.property} — ${res.zone}
+Cra. 43F #11-45, Segundo Piso, Manila, El Poblado, Medellín
+
+🚗 CÓMO LLEGAR
+
+Desde el aeropuerto José María Córdova (Rionegro):
+• Toma el bus Aircoach hacia el centro (~45 min, COP 14.000)
+• O pide un Uber / InDriver desde el aeropuerto (~COP 80.000–100.000, 45 min)
+• Indica la dirección exacta: Cra. 43F #11-45, Manila, El Poblado
+
+Desde el aeropuerto Olaya Herrera (Medellín):
+• Uber / InDriver ~15 min (COP 15.000–25.000)
+
+Desde el Metro (si llegas en transporte público):
+• Estación Aguacatala (Línea A) → Uber/taxi 5 min
+• O camina 10 min subiendo por la Av. El Poblado hacia Manila
+
+🏢 ENTRADA AL EDIFICIO
+
+1. Llega a la Cra. 43F #11-45
+2. El apartamento está en el SEGUNDO PISO
+3. Introduce el código ${res.accessCode} en el panel de la puerta principal
+4. Sube las escaleras al segundo piso
+5. El apartamento es la puerta de la izquierda al llegar al rellano
+
+🔑 TU CÓDIGO DE ACCESO
+${res.accessCode}
+(Válido durante toda tu estancia: ${res.checkin} → ${res.checkout})
+
+⏰ HORARIOS IMPORTANTES
+• Check-in: desde las 15:00h
+• Check-out: hasta las 11:00h
+• Si llegas antes de las 15:00h, podemos guardar tu equipaje si el apartamento está disponible (consulta al concierge)
+• Si necesitas late check-out, consulta disponibilidad con al menos 24h de antelación
+
+📶 WIFI
+Red: ${res.wifiName}
+Contraseña: ${res.wifiPass}
+
+🆘 EMERGENCIAS 24/7
+SOLARA Concierge: +57 304 616 0294
+WhatsApp: +57 304 616 0294
+
+💡 TIPS PARA TU LLEGADA
+• El barrio Manila es completamente seguro a cualquier hora
+• Uber e InDriver funcionan perfectamente en toda la zona
+• Hay supermercado Carulla a 5 min caminando para abastecerte al llegar
+• El apartamento tiene cafetera lista para usar — el café está incluido en tu bienvenida`
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
+        Lee las instrucciones completas para llegar sin problemas.
+      </div>
+
+      <div onScroll={handleScroll}
+        style={{ background: C.white, border: `1px solid ${C.light}`, borderRadius: 10, padding: '14px 16px', maxHeight: 320, overflowY: 'auto', fontSize: 12, lineHeight: 1.8, color: C.text, whiteSpace: 'pre-line', marginBottom: 14 }}>
+        {instrucciones}
+        <div style={{ height: 20 }} />
+        <div style={{ textAlign: 'center', color: C.muted, fontSize: 11 }}>— Fin de las instrucciones —</div>
+      </div>
+
+      {!read && (
+        <div style={{ background: '#fff3cd', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: '#856404', marginBottom: 12, textAlign: 'center' }}>
+          ↓ Desplázate hasta el final para confirmar que las has leído
+        </div>
+      )}
+
+      <button onClick={() => read && onComplete()} disabled={!read}
+        style={{ width: '100%', background: read ? C.dark : C.light, color: C.cream, border: 'none', borderRadius: 10, padding: '14px', cursor: read ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 600 }}>
+        ✓ He leído las instrucciones de llegada →
+      </button>
+    </div>
+  )
+}
+
 export default function GuestApp() {
   const [searchParams] = useSearchParams()
   const resId = searchParams.get('id') || 'RES-001'
-
-  // Find the reservation — in production this would fetch from Notion
   const res = DEMO_RESERVATIONS.find(r => r.id === resId) || DEMO_RESERVATIONS[0]
 
   const [section, setSection] = useState('home')
   const [checkinStep, setCheckinStep] = useState(res.checkinDone ? 4 : 0)
+  const [activeSubStep, setActiveSubStep] = useState(null) // 'datos' | 'tyc' | 'instrucciones'
+  const [guestData, setGuestData] = useState(null)
   const [wifiVisible, setWifiVisible] = useState(false)
   const [keyVisible, setKeyVisible] = useState(res.checkinDone)
   const [cart, setCart] = useState([])
@@ -93,12 +331,13 @@ export default function GuestApp() {
     setCart([])
   }
 
-  const completeCheckinStep = async (i) => {
+  const completeCheckinStep = async (stepIndex) => {
     const next = checkinStep + 1
     setCheckinStep(next)
-    if (i === 2) setKeyVisible(true)
+    setActiveSubStep(null)
+    if (stepIndex === 2) setKeyVisible(true)
     showToast('✦ Paso completado')
-    if (next === CHECKIN_STEPS.length) {
+    if (next === 4) {
       try { await logCheckinToNotion(res.notionPageId, res.id) } catch {}
     }
   }
@@ -119,14 +358,21 @@ export default function GuestApp() {
     setChatLoading(false)
   }
 
-  const progressPct = (checkinStep / CHECKIN_STEPS.length) * 100
-
+  const progressPct = (checkinStep / 4) * 100
   const daysUntilCheckin = () => {
     const diff = Math.ceil((new Date(res.checkin) - new Date()) / 86400000)
     if (diff > 0) return `Faltan ${diff} días`
     if (diff === 0) return '¡Hoy es tu llegada!'
     return `Día ${Math.abs(diff) + 1} de ${res.nights}`
   }
+
+  // Steps definition
+  const STEPS = [
+    { icon: '👤', title: 'Datos personales', desc: 'Nombre, documento, contacto' },
+    { icon: '📋', title: 'Términos y condiciones', desc: 'Leer y aceptar políticas' },
+    { icon: '🔑', title: 'Llave digital', desc: 'Tu código de acceso' },
+    { icon: '🗺️', title: 'Instrucciones de llegada', desc: 'Cómo llegar al apartamento' },
+  ]
 
   return (
     <div style={{ fontFamily: 'Georgia, serif', background: C.cream, minHeight: '100vh', maxWidth: 430, margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
@@ -158,7 +404,7 @@ export default function GuestApp() {
       {/* Nav */}
       <div style={{ background: C.dark, display: 'flex', borderBottom: `2px solid ${C.gold}`, overflowX: 'auto' }}>
         {NAV.map(s => (
-          <button key={s.id} onClick={() => setSection(s.id)} style={{
+          <button key={s.id} onClick={() => { setSection(s.id); setActiveSubStep(null) }} style={{
             flex: '0 0 auto', background: section === s.id ? C.gold : 'transparent',
             color: section === s.id ? C.dark : C.light,
             border: 'none', cursor: 'pointer', padding: '9px 12px',
@@ -171,9 +417,9 @@ export default function GuestApp() {
         ))}
       </div>
 
-      {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
 
+        {/* ── HOME ── */}
         {section === 'home' && (
           <div>
             <div style={{ background: `linear-gradient(155deg, ${C.dark} 0%, #2c3827 55%, #1a2218 100%)`, padding: '22px 20px 20px', position: 'relative', overflow: 'hidden' }}>
@@ -198,13 +444,6 @@ export default function GuestApp() {
                 </div>
               </div>
             </div>
-
-            {res.notes && (
-              <div style={{ margin: '12px 18px 0', background: C.white, borderRadius: 10, padding: '12px 14px', border: `1px solid ${C.light}`, borderLeft: `3px solid ${C.gold}` }}>
-                <div style={{ fontSize: 9, color: C.muted, letterSpacing: 1, marginBottom: 4 }}>NOTAS OPERATIVAS</div>
-                <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5, fontStyle: 'italic' }}>{res.notes}</div>
-              </div>
-            )}
 
             <div style={{ padding: '14px 18px 4px' }}>
               <div style={{ fontSize: 9, letterSpacing: 2, color: C.muted, marginBottom: 10 }}>ACCIONES RÁPIDAS</div>
@@ -239,46 +478,113 @@ export default function GuestApp() {
           </div>
         )}
 
+        {/* ── CHECK-IN ── */}
         {section === 'checkin' && (
           <div style={{ padding: '18px' }}>
-            <div style={{ fontSize: 20, color: C.dark, marginBottom: 4 }}>Check-in Online</div>
-            <div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Se registra automáticamente en Notion</div>
-            <div style={{ background: C.light, borderRadius: 10, height: 7, marginBottom: 20 }}>
-              <div style={{ background: checkinStep >= 4 ? C.green : C.dark, height: 7, borderRadius: 10, width: `${progressPct}%`, transition: 'width 0.5s' }} />
-            </div>
-            {CHECKIN_STEPS.map((step, i) => {
-              const done = i < checkinStep
-              const active = i === checkinStep
-              return (
-                <div key={i} style={{ background: C.white, borderRadius: 12, padding: 14, marginBottom: 8, border: `1px solid ${done ? C.dark : active ? C.gold : C.light}`, opacity: i > checkinStep ? 0.45 : 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: done ? C.dark : active ? C.gold : C.light, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: done ? 16 : 18, color: done ? C.cream : C.dark, flexShrink: 0, fontWeight: 700 }}>
-                      {done ? '✓' : step.icon}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{step.title}</div>
-                      <div style={{ fontSize: 11, color: C.muted }}>{step.desc}</div>
-                    </div>
-                    {active && (
-                      <button onClick={() => completeCheckinStep(i)} style={{ background: C.dark, color: C.cream, border: 'none', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-                        Completar
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-            {keyVisible && (
-              <div style={{ background: C.dark, borderRadius: 14, padding: 22, marginTop: 10, textAlign: 'center' }}>
-                <div style={{ color: C.gold, fontSize: 38, marginBottom: 8 }}>🔑</div>
-                <div style={{ color: C.light, fontSize: 10, letterSpacing: 3, marginBottom: 8 }}>CÓDIGO DE ACCESO</div>
-                <div style={{ color: C.gold, fontSize: 46, fontWeight: 700, letterSpacing: 12, margin: '6px 0 12px', fontFamily: 'monospace' }}>{res.accessCode}</div>
-                <div style={{ color: C.mid, fontSize: 11 }}>Válido: {res.checkin} → {res.checkout}</div>
+
+            {/* Si hay un sub-paso activo, mostrarlo en pantalla completa */}
+            {activeSubStep === 'datos' && (
+              <div>
+                <button onClick={() => setActiveSubStep(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  ← Volver
+                </button>
+                <div style={{ fontSize: 18, color: C.dark, marginBottom: 4 }}>👤 Datos Personales</div>
+                <StepDatos onComplete={(data) => { setGuestData(data); completeCheckinStep(0) }} />
               </div>
+            )}
+
+            {activeSubStep === 'tyc' && (
+              <div>
+                <button onClick={() => setActiveSubStep(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  ← Volver
+                </button>
+                <div style={{ fontSize: 18, color: C.dark, marginBottom: 4 }}>📋 Términos y Condiciones</div>
+                <StepTyC onComplete={() => completeCheckinStep(1)} />
+              </div>
+            )}
+
+            {activeSubStep === 'instrucciones' && (
+              <div>
+                <button onClick={() => setActiveSubStep(null)} style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  ← Volver
+                </button>
+                <div style={{ fontSize: 18, color: C.dark, marginBottom: 4 }}>🗺️ Instrucciones de Llegada</div>
+                <StepInstrucciones res={res} onComplete={() => completeCheckinStep(3)} />
+              </div>
+            )}
+
+            {/* Vista principal del check-in */}
+            {!activeSubStep && (
+              <>
+                <div style={{ fontSize: 20, color: C.dark, marginBottom: 4 }}>Check-in Online</div>
+                <div style={{ fontSize: 12, color: C.muted, marginBottom: 18 }}>Completa todos los pasos antes de tu llegada</div>
+
+                <div style={{ background: C.light, borderRadius: 10, height: 7, marginBottom: 20 }}>
+                  <div style={{ background: checkinStep >= 4 ? C.green : C.dark, height: 7, borderRadius: 10, width: `${progressPct}%`, transition: 'width 0.5s' }} />
+                </div>
+
+                {STEPS.map((step, i) => {
+                  const done = i < checkinStep
+                  const active = i === checkinStep
+                  const subStepKey = i === 0 ? 'datos' : i === 1 ? 'tyc' : i === 3 ? 'instrucciones' : null
+
+                  return (
+                    <div key={i} style={{ background: C.white, borderRadius: 12, padding: 14, marginBottom: 8, border: `1px solid ${done ? C.dark : active ? C.gold : C.light}`, opacity: i > checkinStep ? 0.45 : 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: '50%', background: done ? C.dark : active ? C.gold : C.light, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: done ? 16 : 18, color: done ? C.cream : C.dark, flexShrink: 0, fontWeight: 700 }}>
+                          {done ? '✓' : step.icon}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{step.title}</div>
+                          <div style={{ fontSize: 11, color: C.muted }}>{step.desc}</div>
+                          {done && i === 0 && guestData && (
+                            <div style={{ fontSize: 10, color: C.green, marginTop: 2 }}>✓ {guestData.nombre} {guestData.apellido} · {guestData.tipoDoc} {guestData.numDoc}</div>
+                          )}
+                        </div>
+                        {active && (
+                          <button
+                            onClick={() => {
+                              if (subStepKey) {
+                                setActiveSubStep(subStepKey)
+                              } else {
+                                // Paso 3 (llave digital) — se completa directamente
+                                setKeyVisible(true)
+                                completeCheckinStep(i)
+                              }
+                            }}
+                            style={{ background: C.dark, color: C.cream, border: 'none', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                            {subStepKey ? 'Abrir →' : 'Ver código'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Código de acceso */}
+                {keyVisible && (
+                  <div style={{ background: C.dark, borderRadius: 14, padding: 22, marginTop: 10, textAlign: 'center' }}>
+                    <div style={{ color: C.gold, fontSize: 38, marginBottom: 8 }}>🔑</div>
+                    <div style={{ color: C.light, fontSize: 10, letterSpacing: 3, marginBottom: 8 }}>CÓDIGO DE ACCESO</div>
+                    <div style={{ color: C.gold, fontSize: 46, fontWeight: 700, letterSpacing: 12, margin: '6px 0 12px', fontFamily: 'monospace' }}>{res.accessCode}</div>
+                    <div style={{ color: C.mid, fontSize: 11 }}>Puerta principal · Segundo piso</div>
+                    <div style={{ color: C.mid, fontSize: 11, marginTop: 4 }}>Válido: {res.checkin} → {res.checkout}</div>
+                  </div>
+                )}
+
+                {checkinStep >= 4 && (
+                  <div style={{ background: '#4caf5015', border: '1px solid #4caf50', borderRadius: 12, padding: 16, marginTop: 10, textAlign: 'center' }}>
+                    <div style={{ fontSize: 26, marginBottom: 6 }}>✅</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#2e7d32' }}>Check-in completado</div>
+                    <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Registrado en Notion · {new Date().toLocaleDateString('es-CO')}</div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
 
+        {/* ── INFO ── */}
         {section === 'info' && (
           <div style={{ padding: '18px' }}>
             <div style={{ fontSize: 20, color: C.dark, marginBottom: 14 }}>Tu Estadía</div>
@@ -313,9 +619,18 @@ export default function GuestApp() {
                 </div>
               </div>
             ))}
+            <div style={{ background: C.dark, borderRadius: 12, padding: 14, marginTop: 6 }}>
+              <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, marginBottom: 10 }}>✦ Normas del Activo</div>
+              {['No fumar en interiores (incluido balcón)', 'Mascotas previa autorización', 'Silencio desde las 22h', `Capacidad máxima: ${res.rooms + 3} personas`, 'No fiestas ni eventos privados'].map((r, i) => (
+                <div key={i} style={{ color: C.light, fontSize: 11, marginBottom: 5, display: 'flex', gap: 8 }}>
+                  <span style={{ color: C.mid }}>—</span>{r}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
+        {/* ── SERVICES ── */}
         {section === 'services' && (
           <div style={{ padding: '18px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -345,12 +660,13 @@ export default function GuestApp() {
             })}
             {cart.length > 0 && (
               <button onClick={submitServices} style={{ background: C.dark, color: C.cream, border: 'none', borderRadius: 12, padding: 16, cursor: 'pointer', width: '100%', fontSize: 13, fontWeight: 600, marginTop: 4 }}>
-                ✦ Solicitar {cart.length} servicio{cart.length > 1 ? 's' : ''} — Guardar en Notion
+                ✦ Solicitar {cart.length} servicio{cart.length > 1 ? 's' : ''}
               </button>
             )}
           </div>
         )}
 
+        {/* ── EXPLORE ── */}
         {section === 'explore' && (
           <div style={{ padding: '18px' }}>
             <div style={{ fontSize: 20, color: C.dark, marginBottom: 4 }}>Explorar</div>
@@ -375,6 +691,7 @@ export default function GuestApp() {
           </div>
         )}
 
+        {/* ── CHAT ── */}
         {section === 'chat' && (
           <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 132px)' }}>
             <div style={{ padding: '12px 18px 8px', borderBottom: `1px solid ${C.light}` }}>
@@ -408,7 +725,8 @@ export default function GuestApp() {
               ))}
             </div>
             <div style={{ padding: '10px 16px 14px', background: C.cream, display: 'flex', gap: 8 }}>
-              <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="Escribe tu pregunta..." style={{ flex: 1, padding: '11px 14px', border: `1px solid ${C.mid}`, borderRadius: 24, fontSize: 13, outline: 'none', background: C.white, fontFamily: 'Georgia, serif', color: C.text }} />
+              <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} placeholder="Escribe tu pregunta..."
+                style={{ flex: 1, padding: '11px 14px', border: `1px solid ${C.mid}`, borderRadius: 24, fontSize: 13, outline: 'none', background: C.white, fontFamily: 'Georgia, serif', color: C.text }} />
               <button onClick={sendChat} disabled={chatLoading || !chatInput.trim()} style={{ background: chatInput.trim() && !chatLoading ? C.dark : C.light, color: C.cream, border: 'none', borderRadius: '50%', width: 44, height: 44, cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>✦</button>
             </div>
           </div>
@@ -420,6 +738,7 @@ export default function GuestApp() {
         ::-webkit-scrollbar { width: 3px; height: 3px; }
         ::-webkit-scrollbar-thumb { background: ${C.light}; border-radius: 10px; }
         button:active { transform: scale(0.97); }
+        input:focus, select:focus { border-color: ${C.dark} !important; }
       `}</style>
     </div>
   )
