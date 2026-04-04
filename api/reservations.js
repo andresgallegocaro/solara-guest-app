@@ -31,9 +31,7 @@ function mapPage(page) {
     guestPhone: get('Teléfono'),
     property: get('Propiedad'),
     zone: get('Zona'),
-    checkin,
-    checkout,
-    nights,
+    checkin, checkout, nights,
     guests: get('Huéspedes'),
     accessCode: get('Código Acceso'),
     wifiName: get('WiFi Red'),
@@ -45,8 +43,7 @@ function mapPage(page) {
     checkinDone: get('Check-in Completado'),
     notes: get('Notas Operativas'),
     guestAppUrl: get('Enlace Guest App'),
-    rooms: 3,
-    services: [],
+    rooms: 3, services: [],
   }
 }
 
@@ -57,44 +54,52 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  if (!NOTION_TOKEN) return res.status(500).json({ error: 'NOTION_TOKEN not configured' })
+  if (!NOTION_TOKEN) {
+    return res.status(500).json({ 
+      error: 'NOTION_TOKEN not configured',
+      hint: 'Vercel → Settings → Environment Variables → Add NOTION_TOKEN → Redeploy'
+    })
+  }
 
   const { id } = req.query
 
   try {
-    if (id) {
-      // Buscar reserva por ID
-      const searchRes = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB}/query`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${NOTION_TOKEN}`,
-          'Notion-Version': '2022-06-28',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filter: {
-            property: 'ID Reserva',
-            title: { equals: id }
-          }
-        }),
-      })
-      const data = await searchRes.json()
-      if (!data.results?.length) return res.status(404).json({ error: `Reserva ${id} no encontrada` })
-      return res.status(200).json(mapPage(data.results[0]))
-    }
+    const body = id
+      ? { filter: { property: 'ID Reserva', title: { equals: id } } }
+      : { sorts: [{ property: 'Check-in', direction: 'descending' }] }
 
-    // Devolver todas las reservas
-    const allRes = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB}/query`, {
+    const notionRes = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB}/query`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${NOTION_TOKEN}`,
         'Notion-Version': '2022-06-28',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ sorts: [{ property: 'Check-in', direction: 'descending' }] }),
+      body: JSON.stringify(body),
     })
-    const allData = await allRes.json()
-    return res.status(200).json(allData.results.map(mapPage))
+
+    const data = await notionRes.json()
+
+    if (!notionRes.ok) {
+      return res.status(notionRes.status).json({
+        error: data.message || 'Notion API error',
+        code: data.code,
+        hint: data.code === 'unauthorized' 
+          ? 'Check NOTION_TOKEN and database connection permissions'
+          : 'Unknown Notion error'
+      })
+    }
+
+    if (!data.results) {
+      return res.status(500).json({ error: 'No results from Notion', raw: data })
+    }
+
+    if (id) {
+      if (!data.results.length) return res.status(404).json({ error: `Reserva ${id} no encontrada` })
+      return res.status(200).json(mapPage(data.results[0]))
+    }
+
+    return res.status(200).json(data.results.map(mapPage))
 
   } catch (err) {
     return res.status(500).json({ error: err.message })
