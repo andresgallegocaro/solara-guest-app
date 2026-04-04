@@ -1,4 +1,4 @@
-const NOTION_DB = '3b0b7cac-2a88-4e30-a700-75e3a39e83f7'
+const NOTION_DB = '201f8d6b-5a24-4289-8d42-4488cd32e293'
 const NOTION_TOKEN = process.env.NOTION_TOKEN
 
 function mapPage(page) {
@@ -55,10 +55,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   if (!NOTION_TOKEN) {
-    return res.status(500).json({ 
-      error: 'NOTION_TOKEN not configured',
-      hint: 'Vercel → Settings → Environment Variables → Add NOTION_TOKEN → Redeploy'
-    })
+    return res.status(500).json({ error: 'NOTION_TOKEN not configured' })
   }
 
   const { id } = req.query
@@ -84,9 +81,6 @@ module.exports = async function handler(req, res) {
       return res.status(notionRes.status).json({
         error: data.message || 'Notion API error',
         code: data.code,
-        hint: data.code === 'unauthorized' 
-          ? 'Check NOTION_TOKEN and database connection permissions'
-          : 'Unknown Notion error'
       })
     }
 
