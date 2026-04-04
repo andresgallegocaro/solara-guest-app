@@ -1,4 +1,4 @@
-const NOTION_DB = '3b0b7cac-2a88-4e30-a700-75e3a39e83f7'
+const NOTION_DB = '201f8d6b-5a24-4289-8d42-4488cd32e293'
 const NOTION_TOKEN = process.env.NOTION_TOKEN
 
 module.exports = async function handler(req, res) {
