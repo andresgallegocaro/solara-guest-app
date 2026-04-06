@@ -1,23 +1,20 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Home from './pages/Home'
 import GuestApp from './pages/GuestApp'
 import AdminPanel from './pages/AdminPanel'
-import Home from './pages/Home'
+import OwnerPortal from './pages/OwnerPortal'
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
     <BrowserRouter>
       <Routes>
-        {/* Página de inicio — elige si eres huésped o admin */}
         <Route path="/" element={<Home />} />
-
-        {/* Guest App — el huésped abre: /guest?id=RES-001 */}
         <Route path="/guest" element={<GuestApp />} />
-
-        {/* Panel de administración — solo para ti */}
         <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/owner" element={<OwnerPortal />} />
       </Routes>
     </BrowserRouter>
-  </React.StrictMode>
+  </StrictMode>
 )
