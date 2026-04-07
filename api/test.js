@@ -1,38 +1,47 @@
+const NOTION_DB = '201f8d6b-5a24-4289-8d42-4488cd32e293'
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  
-  // Test directo a Anthropic con mensaje mínimo
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey ? apiKey.trim() : '',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 10,
-        messages: [{ role: 'user', content: 'Di solo: OK' }],
-      }),
-    })
 
-    const data = await response.json()
-    
-    return res.status(200).json({
-      keyExists: !!apiKey,
-      keyLength: apiKey ? apiKey.trim().length : 0,
-      keyStart: apiKey ? apiKey.trim().substring(0, 12) : 'NONE',
-      anthropicStatus: response.status,
-      anthropicResponse: data,
-    })
+  const notionToken = process.env.NOTION_TOKEN
+  const anthropicKey = process.env.ANTHROPIC_API_KEY
 
-  } catch (err) {
-    return res.status(200).json({
-      keyExists: !!apiKey,
-      error: err.message
-    })
+  const result = {
+    notionToken: {
+      exists: !!notionToken,
+      length: notionToken?.length || 0,
+      start: notionToken ? notionToken.substring(0, 10) : 'MISSING',
+    },
+    anthropicKey: {
+      exists: !!anthropicKey,
+      start: anthropicKey ? anthropicKey.substring(0, 12) : 'MISSING',
+    },
   }
+
+  // Test Notion API directly
+  if (notionToken) {
+    try {
+      const notionRes = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB}/query`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${notionToken}`,
+          'Notion-Version': '2022-06-28',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ page_size: 1 }),
+      })
+      const notionData = await notionRes.json()
+      result.notionTest = {
+        status: notionRes.status,
+        ok: notionRes.ok,
+        error: notionData.code || null,
+        message: notionData.message || null,
+        resultsCount: notionData.results?.length ?? null,
+      }
+    } catch (err) {
+      result.notionTest = { error: err.message }
+    }
+  }
+
+  return res.status(200).json(result)
 }
