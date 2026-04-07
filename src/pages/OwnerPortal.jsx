@@ -1,7 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { C } from '../config'
 
-// ── Demo data por propiedad ───────────────────────────────────────────────
+// ── Glosario de términos ─────────────────────────────────────────────────
+const TERMINOS = {
+  ADR: { nombre: 'Precio medio por noche', descripcion: 'Cuánto cobras de media por cada noche vendida. Si vendiste 10 noches por un total de 4.000.000 COP, tu precio medio es 400.000 COP/noche.' },
+  RevPAR: { nombre: 'Ingreso por noche disponible', descripcion: 'Lo que ganas por noche, contando también las noches vacías. Si tienes ocupación del 70% y precio medio de 400K, tu ingreso por noche disponible es 280.000 COP.' },
+  Ocupación: { nombre: '% de noches vendidas', descripcion: 'De todas las noches del mes que tu propiedad estaba disponible, cuántas porcentualmente se ocuparon. 70% significa que 21 de 30 noches estuvieron ocupadas.' },
+  'Ingresos brutos': { nombre: 'Lo que entra antes de gastos', descripcion: 'El dinero total que generaron tus huéspedes antes de descontar gastos de operación, comisiones y el fee de SOLARA.' },
+  'Ingresos netos': { nombre: 'Lo que te queda a ti', descripcion: 'El dinero que recibes tú después de descontar todos los gastos: limpieza, suministros, comisiones de plataformas y el fee de SOLARA.' },
+  'Fee SOLARA': { nombre: 'Comisión de gestión SOLARA', descripcion: 'El 15% que cobra SOLARA sobre el beneficio neto generado. Solo cobramos si tú ganas — si no hay ingresos netos, no hay fee.' },
+  RevPAR: { nombre: 'Ingreso por noche disponible', descripcion: 'Ingreso total dividido entre todas las noches del mes (ocupadas + libres). Mide qué tan bien optimizas tu activo en conjunto.' },
+  Benchmarking: { nombre: 'Comparativa con el mercado', descripcion: 'Cómo está tu propiedad comparada con apartamentos similares en tu zona. Si estás por encima es señal de buena gestión.' },
+}
+
+// ── Demo data ────────────────────────────────────────────────────────────
 const OWNER_DATA = {
   'SOLARA Manila 1': {
     propietario: 'Felipe Jaramillo',
@@ -45,20 +57,10 @@ const OWNER_DATA = {
       { id: 'RES-008', huesped: 'Marco Rossi', checkin: '10 Abr', checkout: '14 Abr', noches: 4, total: 1680000, plataforma: 'Airbnb', estado: 'Confirmada' },
       { id: 'RES-009', huesped: 'Ana García', checkin: '17 Abr', checkout: '20 Abr', noches: 3, total: 1260000, plataforma: 'Booking', estado: 'Confirmada' },
     ],
-    competencia: {
-      tuADR: 420000,
-      mercadoADR: 385000,
-      tuOcupacion: 73,
-      mercadoOcupacion: 68,
-      tuRevPAR: 306600,
-      mercadoRevPAR: 261800,
-    },
+    competencia: { tuADR: 420000, mercadoADR: 385000, tuOcupacion: 73, mercadoOcupacion: 68, tuRevPAR: 306600, mercadoRevPAR: 261800 },
     proyeccion: {
-      mes: 'Mayo 2026',
-      ingresosBrutos: 9800000,
-      ocupacionEst: 75,
-      adrEst: 435000,
-      eventosDestacados: ['Festival Internacional de Tango (3–8 Jun próximo)', 'Temporada alta mayo'],
+      mes: 'Mayo 2026', ingresosBrutos: 9800000, ocupacionEst: 75, adrEst: 435000,
+      eventosDestacados: ['Festival Internacional de Tango (3–8 Jun próximo)', 'Temporada alta mayo — sube precios fines de semana'],
     },
   },
 }
@@ -71,23 +73,41 @@ function fmt(n) {
   if (n >= 1000) return `$${Math.round(n / 1000)}K`
   return `$${n}`
 }
+function fmtFull(n) { return `COP ${n?.toLocaleString('es-CO')}` }
 
-function fmtFull(n) {
-  return `COP ${n?.toLocaleString('es-CO')}`
+// Tooltip de término
+function TerminoTooltip({ term, children }) {
+  const [show, setShow] = useState(false)
+  const info = TERMINOS[term]
+  if (!info) return children
+  return (
+    <span style={{ position: 'relative', display: 'inline-block' }}>
+      <span onClick={() => setShow(!show)} style={{ borderBottom: `1px dashed ${C.gold}`, cursor: 'pointer' }}>{children}</span>
+      {show && (
+        <div onClick={() => setShow(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.5)',
+        }}>
+          <div style={{ background: C.white, borderRadius: 14, padding: 20, maxWidth: 300, margin: 20 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: C.dark, marginBottom: 8 }}>{info.nombre}</div>
+            <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.6 }}>{info.descripcion}</div>
+            <button onClick={() => setShow(false)} style={{ background: C.dark, color: C.cream, border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', marginTop: 14, fontSize: 12, width: '100%' }}>Entendido ✓</button>
+          </div>
+        </div>
+      )}
+    </span>
+  )
 }
 
-function KPICard({ icon, label, value, sub, highlight, trend }) {
+function KPICard({ icon, label, value, sub, highlight, trend, termino }) {
   return (
-    <div style={{
-      background: highlight ? C.dark : C.white,
-      border: `1px solid ${highlight ? C.gold : C.light}`,
-      borderRadius: 14, padding: '14px 16px',
-      position: 'relative', overflow: 'hidden',
-    }}>
+    <div style={{ background: highlight ? C.dark : C.white, border: `1px solid ${highlight ? C.gold : C.light}`, borderRadius: 14, padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
       {highlight && <div style={{ position: 'absolute', top: 0, right: 0, width: 60, height: 60, background: `radial-gradient(circle, ${C.gold}22, transparent 70%)` }} />}
       <div style={{ fontSize: 20, marginBottom: 6 }}>{icon}</div>
-      <div style={{ fontSize: 10, color: highlight ? C.mid : C.muted, letterSpacing: 1, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: highlight ? C.gold : C.dark, letterSpacing: -0.5 }}>{value}</div>
+      <div style={{ fontSize: 10, color: highlight ? C.mid : C.muted, letterSpacing: 1, marginBottom: 4 }}>
+        {termino ? <TerminoTooltip term={termino}>{label}</TerminoTooltip> : label}
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: highlight ? C.gold : C.dark }}>{value}</div>
       {sub && <div style={{ fontSize: 10, color: highlight ? C.mid : C.muted, marginTop: 3 }}>{sub}</div>}
       {trend && (
         <div style={{ position: 'absolute', top: 14, right: 14, fontSize: 10, color: trend > 0 ? '#4caf50' : '#e53935', fontWeight: 700 }}>
@@ -98,7 +118,7 @@ function KPICard({ icon, label, value, sub, highlight, trend }) {
   )
 }
 
-function BarChart({ data, valueKey, label, color, maxValue }) {
+function BarChart({ data, valueKey, color, maxValue }) {
   const max = maxValue || Math.max(...data.map(d => d[valueKey]))
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80, padding: '0 4px' }}>
@@ -110,12 +130,7 @@ function BarChart({ data, valueKey, label, color, maxValue }) {
             <div style={{ fontSize: 8, color: isLast ? C.gold : C.muted, fontWeight: isLast ? 700 : 400 }}>
               {valueKey === 'ingresos' ? fmt(d[valueKey]) : `${d[valueKey]}%`}
             </div>
-            <div style={{
-              width: '100%', borderRadius: '3px 3px 0 0',
-              background: isLast ? C.gold : `${color}66`,
-              height: `${pct}%`, minHeight: 3,
-              transition: 'height 0.5s ease',
-            }} />
+            <div style={{ width: '100%', borderRadius: '3px 3px 0 0', background: isLast ? C.gold : `${color}66`, height: `${pct}%`, minHeight: 3 }} />
             <div style={{ fontSize: 8, color: isLast ? C.dark : C.muted, fontWeight: isLast ? 700 : 400 }}>{d.mes}</div>
           </div>
         )
@@ -124,70 +139,63 @@ function BarChart({ data, valueKey, label, color, maxValue }) {
   )
 }
 
-function GastoRow({ concepto, monto, tipo }) {
-  const colors = {
-    'Operativo': '#1976d2', 'Mantenimiento': '#f57200',
-    'Gestión': C.dark, 'Plataforma': '#9c27b0',
-  }
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${C.light}` }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12, color: C.dark }}>{concepto}</div>
-        <span style={{ fontSize: 9, color: colors[tipo] || C.muted, background: `${colors[tipo]}15`, padding: '1px 6px', borderRadius: 8, marginTop: 2, display: 'inline-block' }}>{tipo}</span>
-      </div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>{fmtFull(monto)}</div>
-    </div>
-  )
-}
-
-function CompBar({ label, tuValor, mercadoValor, isPercent }) {
+function CompBar({ label, tuValor, mercadoValor, isPercent, termino }) {
   const maxVal = Math.max(tuValor, mercadoValor) * 1.2
-  const tuPct = (tuValor / maxVal) * 100
-  const mercadoPct = (mercadoValor / maxVal) * 100
   const mejor = tuValor > mercadoValor
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 11, color: C.muted }}>{label}</span>
+        <span style={{ fontSize: 11, color: C.muted }}>
+          {termino ? <TerminoTooltip term={termino}>{label}</TerminoTooltip> : label}
+        </span>
         <span style={{ fontSize: 11, color: mejor ? '#4caf50' : C.muted, fontWeight: 700 }}>
           {mejor ? '▲' : '▼'} {isPercent ? `${tuValor}%` : fmt(tuValor)}
         </span>
       </div>
-      <div style={{ marginBottom: 3 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ fontSize: 9, color: C.dark, width: 40 }}>TÚ</div>
-          <div style={{ flex: 1, background: C.light, borderRadius: 4, height: 8 }}>
-            <div style={{ width: `${tuPct}%`, background: C.dark, height: 8, borderRadius: 4 }} />
+      {[
+        { label: 'TÚ', val: tuValor, color: C.dark },
+        { label: 'MERCADO', val: mercadoValor, color: C.mid },
+      ].map((b, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+          <div style={{ fontSize: 9, color: b.color, width: 52 }}>{b.label}</div>
+          <div style={{ flex: 1, background: C.light, borderRadius: 4, height: 7 }}>
+            <div style={{ width: `${(b.val / maxVal) * 100}%`, background: b.color, height: 7, borderRadius: 4 }} />
           </div>
-          <div style={{ fontSize: 9, color: C.dark, width: 50, textAlign: 'right' }}>
-            {isPercent ? `${tuValor}%` : fmt(tuValor)}
-          </div>
-        </div>
-      </div>
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ fontSize: 9, color: C.muted, width: 40 }}>MKTD</div>
-          <div style={{ flex: 1, background: C.light, borderRadius: 4, height: 8 }}>
-            <div style={{ width: `${mercadoPct}%`, background: C.mid, height: 8, borderRadius: 4 }} />
-          </div>
-          <div style={{ fontSize: 9, color: C.muted, width: 50, textAlign: 'right' }}>
-            {isPercent ? `${mercadoValor}%` : fmt(mercadoValor)}
+          <div style={{ fontSize: 9, color: b.color, width: 54, textAlign: 'right' }}>
+            {isPercent ? `${b.val}%` : fmt(b.val)}
           </div>
         </div>
-      </div>
+      ))}
     </div>
   )
 }
 
+// ── PDF Print styles ──────────────────────────────────────────────────────
+const PDF_STYLES = `
+@media print {
+  body { background: white !important; }
+  .no-print { display: none !important; }
+  .print-page { page-break-after: always; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  @page { margin: 15mm; size: A4; }
+}
+`
+
 export default function OwnerPortal() {
   const [propiedad, setPropiedad] = useState(PROPIEDADES[0])
   const [seccion, setSeccion] = useState('resumen')
-  const [mesIdx, setMesIdx] = useState(6)
+  const [pdfMode, setPdfMode] = useState(false)
   const data = OWNER_DATA[propiedad]
   const { kpis, gastos, historial, reservasActuales, competencia, proyeccion } = data
-
   const totalGastos = gastos.reduce((s, g) => s + g.monto, 0)
-  const ingresosNetos = kpis.ingresosBrutos - totalGastos + kpis.feeSolara // fee ya está en gastos
+
+  const handlePDF = () => {
+    setPdfMode(true)
+    setTimeout(() => {
+      window.print()
+      setPdfMode(false)
+    }, 300)
+  }
 
   const SECCIONES = [
     { id: 'resumen', icon: '📊', label: 'Resumen' },
@@ -200,10 +208,11 @@ export default function OwnerPortal() {
 
   return (
     <div style={{ fontFamily: 'Georgia, serif', background: '#f8f6f1', minHeight: '100vh', maxWidth: 430, margin: '0 auto' }}>
+      <style>{PDF_STYLES}</style>
 
       {/* Header */}
-      <div style={{ background: C.dark, padding: '16px 18px 0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+      <div style={{ background: C.dark, padding: '16px 18px 0' }} className="no-print">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ color: C.gold, fontSize: 16, letterSpacing: 3, fontWeight: 700 }}>SOLARA</span>
@@ -211,27 +220,23 @@ export default function OwnerPortal() {
             </div>
             <div style={{ color: C.light, fontSize: 11, marginTop: 2 }}>Portal del Propietario</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
             <div style={{ color: C.gold, fontSize: 10, fontWeight: 700 }}>{data.mesActual}</div>
-            <div style={{ color: C.mid, fontSize: 9 }}>Informe mensual</div>
+            <button onClick={handlePDF} style={{
+              background: C.gold, color: C.dark, border: 'none', borderRadius: 8,
+              padding: '5px 10px', cursor: 'pointer', fontSize: 10, fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              📄 Descargar PDF
+            </button>
           </div>
         </div>
 
-        {/* Selector propiedad */}
-        {PROPIEDADES.length > 1 && (
-          <select value={propiedad} onChange={e => setPropiedad(e.target.value)}
-            style={{ width: '100%', background: 'rgba(255,255,255,0.1)', border: `1px solid ${C.mid}`, color: C.cream, borderRadius: 8, padding: '6px 10px', fontSize: 11, marginBottom: 10, fontFamily: 'Georgia,serif' }}>
-            {PROPIEDADES.map(p => <option key={p} style={{ background: C.dark }}>{p}</option>)}
-          </select>
-        )}
-
-        {/* Propiedad info */}
-        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: '10px 10px 0 0', padding: '10px 14px', marginTop: 4 }}>
+        <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: '10px 10px 0 0', padding: '8px 14px' }}>
           <div style={{ color: C.cream, fontSize: 13, fontWeight: 600 }}>{data.propiedad}</div>
           <div style={{ color: C.mid, fontSize: 10 }}>{data.ubicacion} · {data.area} · {data.habitaciones} hab</div>
         </div>
 
-        {/* Nav */}
         <div style={{ display: 'flex', overflowX: 'auto', borderTop: `1px solid rgba(255,255,255,0.1)` }}>
           {SECCIONES.map(s => (
             <button key={s.id} onClick={() => setSeccion(s.id)} style={{
@@ -248,7 +253,28 @@ export default function OwnerPortal() {
         </div>
       </div>
 
+      {/* PDF Header — solo al imprimir */}
+      <div style={{ display: 'none', padding: '20px 24px 10px', background: C.dark }} className="print-only">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ color: C.gold, fontSize: 22, letterSpacing: 4, fontWeight: 700 }}>SOLARA</div>
+            <div style={{ color: C.mid, fontSize: 10, letterSpacing: 2 }}>INFORME MENSUAL DE PROPIETARIO</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ color: C.cream, fontSize: 14 }}>{data.propiedad}</div>
+            <div style={{ color: C.mid, fontSize: 11 }}>{data.mesActual} · {data.ubicacion}</div>
+          </div>
+        </div>
+      </div>
+
       <div style={{ padding: '18px', paddingBottom: 40 }}>
+
+        {/* Aviso de términos */}
+        {seccion === 'resumen' && (
+          <div style={{ background: '#e8f5e9', border: '1px solid #4caf50', borderRadius: 10, padding: '10px 12px', marginBottom: 14, fontSize: 11, color: '#2e7d32' }}>
+            💡 Toca cualquier término subrayado para ver su explicación en lenguaje sencillo
+          </div>
+        )}
 
         {/* ── RESUMEN ── */}
         {seccion === 'resumen' && (
@@ -256,35 +282,34 @@ export default function OwnerPortal() {
             <div style={{ fontSize: 16, color: C.dark, marginBottom: 4 }}>Resumen Ejecutivo</div>
             <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>{data.mesActual} · {data.propiedad}</div>
 
-            {/* KPIs principales */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-              <KPICard icon="💰" label="INGRESOS BRUTOS" value={fmt(kpis.ingresosBrutos)} sub={fmtFull(kpis.ingresosBrutos)} highlight trend={9} />
-              <KPICard icon="🏠" label="INGRESOS NETOS" value={fmt(kpis.ingresosNetos)} sub="Después de gastos" trend={7} />
-              <KPICard icon="📅" label="OCUPACIÓN" value={`${kpis.ocupacion}%`} sub={`${kpis.noches} noches vendidas`} trend={5} />
-              <KPICard icon="💵" label="ADR" value={fmt(kpis.adr)} sub="Precio medio/noche" trend={3} />
-              <KPICard icon="📊" label="RevPAR" value={fmt(kpis.revpar)} sub="Ingreso por noche disp." trend={8} />
-              <KPICard icon="⭐" label="RATING MEDIO" value={kpis.rating} sub={`${kpis.totalReseñas} reseñas totales`} />
+              <KPICard icon="💰" label="INGRESOS TOTALES" value={fmt(kpis.ingresosBrutos)} sub={fmtFull(kpis.ingresosBrutos)} highlight trend={9} termino="Ingresos brutos" />
+              <KPICard icon="🏠" label="LO QUE TE QUEDA" value={fmt(kpis.ingresosNetos)} sub="Después de gastos" trend={7} termino="Ingresos netos" />
+              <KPICard icon="📅" label="NOCHES VENDIDAS" value={`${kpis.ocupacion}%`} sub={`${kpis.noches} de 30 noches`} trend={5} termino="Ocupación" />
+              <KPICard icon="💵" label="PRECIO MEDIO/NOCHE" value={fmt(kpis.adr)} sub="Por huésped" trend={3} termino="ADR" />
+              <KPICard icon="📊" label="INGRESO/NOCHE DISP." value={fmt(kpis.revpar)} sub="Incl. noches vacías" trend={8} termino="RevPAR" />
+              <KPICard icon="⭐" label="VALORACIÓN MEDIA" value={kpis.rating} sub={`${kpis.totalReseñas} reseñas totales`} />
             </div>
 
-            {/* Fee SOLARA */}
             <div style={{ background: C.dark, borderRadius: 12, padding: 14, marginBottom: 12 }}>
-              <div style={{ color: C.gold, fontSize: 11, fontWeight: 700, marginBottom: 8 }}>✦ Liquidación SOLARA — {data.mesActual}</div>
+              <div style={{ color: C.gold, fontSize: 11, fontWeight: 700, marginBottom: 10 }}>
+                ✦ Liquidación SOLARA — {data.mesActual}
+              </div>
               {[
-                { label: 'Ingresos brutos generados', value: fmtFull(kpis.ingresosBrutos), color: C.cream },
-                { label: 'Gastos operativos', value: `- ${fmtFull(totalGastos - kpis.feeSolara)}`, color: C.mid },
-                { label: 'Fee SOLARA (15% neto)', value: `- ${fmtFull(kpis.feeSolara)}`, color: C.gold },
-                { label: 'Transferencia al propietario', value: fmtFull(kpis.ingresosBrutos - totalGastos), color: '#4caf50', bold: true },
+                { label: 'Dinero que generaron tus huéspedes', value: fmtFull(kpis.ingresosBrutos), color: C.cream },
+                { label: 'Gastos de operación (limpieza, etc.)', value: `- ${fmtFull(totalGastos - kpis.feeSolara)}`, color: C.mid },
+                { label: 'Comisión de gestión SOLARA (15%)', value: `- ${fmtFull(kpis.feeSolara)}`, color: C.gold },
+                { label: '✓ Transferencia a tu cuenta', value: fmtFull(kpis.ingresosBrutos - totalGastos), color: '#4caf50', bold: true },
               ].map((r, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, paddingBottom: 6, borderBottom: i < 3 ? `1px solid rgba(255,255,255,0.08)` : 'none' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7, paddingBottom: 7, borderBottom: i < 3 ? `1px solid rgba(255,255,255,0.08)` : 'none' }}>
                   <span style={{ fontSize: 11, color: C.mid }}>{r.label}</span>
                   <span style={{ fontSize: 12, color: r.color, fontWeight: r.bold ? 700 : 400 }}>{r.value}</span>
                 </div>
               ))}
             </div>
 
-            {/* Mini chart */}
             <div style={{ background: C.white, borderRadius: 12, padding: 14, border: `1px solid ${C.light}` }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Ingresos últimos 7 meses</div>
+              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Evolución de ingresos — últimos 7 meses</div>
               <BarChart data={historial} valueKey="ingresos" color={C.dark} />
             </div>
           </div>
@@ -294,42 +319,40 @@ export default function OwnerPortal() {
         {seccion === 'ingresos' && (
           <div>
             <div style={{ fontSize: 16, color: C.dark, marginBottom: 16 }}>Análisis de Ingresos</div>
+            {[
+              { title: 'Ingresos totales por mes', key: 'ingresos', color: C.dark },
+              { title: '% de noches vendidas por mes', key: 'ocupacion', color: '#1976d2', max: 100 },
+              { title: 'Precio medio por noche — evolución', key: 'adr', color: C.gold },
+            ].map((c, i) => (
+              <div key={i} style={{ background: C.white, borderRadius: 12, padding: 14, marginBottom: 12, border: `1px solid ${C.light}` }}>
+                <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>{c.title}</div>
+                <BarChart data={historial} valueKey={c.key} color={c.color} maxValue={c.max} />
+              </div>
+            ))}
 
-            <div style={{ background: C.white, borderRadius: 12, padding: 14, marginBottom: 12, border: `1px solid ${C.light}` }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Evolución mensual — Ingresos</div>
-              <BarChart data={historial} valueKey="ingresos" color={C.dark} />
-            </div>
-
-            <div style={{ background: C.white, borderRadius: 12, padding: 14, marginBottom: 12, border: `1px solid ${C.light}` }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Evolución mensual — Ocupación</div>
-              <BarChart data={historial} valueKey="ocupacion" color="#1976d2" maxValue={100} />
-            </div>
-
-            <div style={{ background: C.white, borderRadius: 12, padding: 14, marginBottom: 12, border: `1px solid ${C.light}` }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Evolución mensual — ADR</div>
-              <BarChart data={historial} valueKey="adr" color={C.gold} />
-            </div>
-
-            {/* Desglose por plataforma */}
             <div style={{ background: C.white, borderRadius: 12, padding: 14, border: `1px solid ${C.light}` }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Desglose por plataforma</div>
+              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>¿De dónde vienen tus reservas?</div>
               {[
-                { plataforma: 'Airbnb', pct: 62, ingresos: 5728800, color: '#FF5A5F' },
-                { plataforma: 'Booking.com', pct: 24, ingresos: 2217600, color: '#003580' },
-                { plataforma: 'Canal directo', pct: 14, ingresos: 1293600, color: C.dark },
+                { plataforma: 'Airbnb', pct: 62, ingresos: 5728800, color: '#FF5A5F', nota: 'Cobra 3% de comisión' },
+                { plataforma: 'Booking.com', pct: 24, ingresos: 2217600, color: '#003580', nota: 'Cobra 15% de comisión' },
+                { plataforma: 'Reserva directa SOLARA', pct: 14, ingresos: 1293600, color: C.dark, nota: 'Sin comisión ← objetivo' },
               ].map((p, i) => (
                 <div key={i} style={{ marginBottom: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 11, color: C.dark }}>{p.plataforma}</span>
-                    <span style={{ fontSize: 11, color: C.muted }}>{fmtFull(p.ingresos)} · {p.pct}%</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                    <div>
+                      <span style={{ fontSize: 11, color: C.dark }}>{p.plataforma}</span>
+                      <span style={{ fontSize: 9, color: C.muted, marginLeft: 6 }}>{p.nota}</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: C.muted }}>{p.pct}%</span>
                   </div>
-                  <div style={{ background: C.light, borderRadius: 4, height: 6 }}>
-                    <div style={{ width: `${p.pct}%`, background: p.color, height: 6, borderRadius: 4 }} />
+                  <div style={{ background: C.light, borderRadius: 4, height: 7 }}>
+                    <div style={{ width: `${p.pct}%`, background: p.color, height: 7, borderRadius: 4 }} />
                   </div>
+                  <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>{fmtFull(p.ingresos)}</div>
                 </div>
               ))}
-              <div style={{ background: '#fff3cd', borderRadius: 8, padding: '8px 10px', marginTop: 8 }}>
-                <div style={{ fontSize: 10, color: '#856404' }}>💡 Objetivo SOLARA: aumentar canal directo al 30% en 24 meses para reducir comisiones OTA</div>
+              <div style={{ background: '#e8f5e9', borderRadius: 8, padding: '8px 10px', marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: '#2e7d32' }}>🎯 Objetivo SOLARA: llevar las reservas directas al 30% en 2 años — menos comisiones, más ingresos para ti</div>
               </div>
             </div>
           </div>
@@ -338,15 +361,14 @@ export default function OwnerPortal() {
         {/* ── RESERVAS ── */}
         {seccion === 'reservas' && (
           <div>
-            <div style={{ fontSize: 16, color: C.dark, marginBottom: 4 }}>Reservas del Mes</div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>{kpis.reservas} reservas · {kpis.cancelaciones} cancelación</div>
+            <div style={{ fontSize: 16, color: C.dark, marginBottom: 4 }}>Tus Reservas</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>{kpis.reservas} reservas este mes · {kpis.cancelaciones} cancelación</div>
 
-            {/* Stats rápidas */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
               {[
                 { label: 'Reservas', value: kpis.reservas, icon: '📅' },
-                { label: 'Noches', value: kpis.noches, icon: '🌙' },
-                { label: 'Cancelac.', value: kpis.cancelaciones, icon: '❌' },
+                { label: 'Noches vendidas', value: kpis.noches, icon: '🌙' },
+                { label: 'Cancelaciones', value: kpis.cancelaciones, icon: '❌' },
               ].map((s, i) => (
                 <div key={i} style={{ background: C.white, borderRadius: 10, padding: 12, textAlign: 'center', border: `1px solid ${C.light}` }}>
                   <div style={{ fontSize: 20 }}>{s.icon}</div>
@@ -356,45 +378,40 @@ export default function OwnerPortal() {
               ))}
             </div>
 
-            {/* Reservas activas */}
-            <div style={{ fontSize: 11, color: C.muted, letterSpacing: 1, marginBottom: 8 }}>RESERVAS ACTIVAS / PRÓXIMAS</div>
+            <div style={{ fontSize: 11, color: C.muted, letterSpacing: 1, marginBottom: 8 }}>PRÓXIMAS ESTANCIAS</div>
             {reservasActuales.map((r, i) => (
               <div key={i} style={{ background: C.white, borderRadius: 12, padding: 14, marginBottom: 8, border: `1px solid ${C.light}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>{r.huesped}</div>
                     <div style={{ fontSize: 10, color: C.muted, margin: '3px 0' }}>{r.checkin} → {r.checkout} · {r.noches} noches</div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <span style={{ fontSize: 9, background: C.light, color: C.dark, padding: '2px 7px', borderRadius: 8 }}>{r.plataforma}</span>
-                      <span style={{ fontSize: 9, background: '#1976d215', color: '#1976d2', padding: '2px 7px', borderRadius: 8 }}>{r.estado}</span>
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.gold }}>{fmtFull(r.total)}</div>
-                    <div style={{ fontSize: 9, color: C.muted }}>{r.id}</div>
+                    <div style={{ fontSize: 9, color: '#4caf50' }}>{r.estado}</div>
                   </div>
                 </div>
               </div>
             ))}
 
-            {/* Calendario visual simplificado */}
-            <div style={{ background: C.white, borderRadius: 12, padding: 14, border: `1px solid ${C.light}`, marginTop: 8 }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 10 }}>Ocupación Abril 2026</div>
+            {/* Calendario */}
+            <div style={{ background: C.white, borderRadius: 12, padding: 14, border: `1px solid ${C.light}`, marginTop: 4 }}>
+              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 10 }}>Calendario de ocupación — Abril 2026</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
-                {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map(d => (
+                {['L','M','X','J','V','S','D'].map(d => (
                   <div key={d} style={{ textAlign: 'center', fontSize: 8, color: C.muted, paddingBottom: 4 }}>{d}</div>
                 ))}
                 {Array.from({ length: 30 }, (_, i) => {
                   const dia = i + 1
                   const ocupado = [5,6,7,8,10,11,12,13,14,17,18,19,20,22,23,24,25,26,27,28].includes(dia)
-                  const hoy = dia === 6
+                  const hoy = dia === 7
                   return (
-                    <div key={i} style={{
-                      textAlign: 'center', fontSize: 9, padding: '5px 2px', borderRadius: 4,
-                      background: hoy ? C.gold : ocupado ? C.dark : C.cream,
-                      color: hoy ? C.dark : ocupado ? C.cream : C.muted,
-                      fontWeight: hoy ? 700 : 400,
-                    }}>{dia}</div>
+                    <div key={i} style={{ textAlign: 'center', fontSize: 9, padding: '5px 2px', borderRadius: 4, background: hoy ? C.gold : ocupado ? C.dark : C.cream, color: hoy ? C.dark : ocupado ? C.cream : C.muted, fontWeight: hoy ? 700 : 400 }}>
+                      {dia}
+                    </div>
                   )
                 })}
               </div>
@@ -414,53 +431,57 @@ export default function OwnerPortal() {
         {seccion === 'gastos' && (
           <div>
             <div style={{ fontSize: 16, color: C.dark, marginBottom: 4 }}>Gastos Operativos</div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>{data.mesActual}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>{data.mesActual} — todos los costes de tu propiedad</div>
 
-            {/* Resumen gastos */}
             <div style={{ background: C.dark, borderRadius: 12, padding: 14, marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ color: C.mid, fontSize: 10, letterSpacing: 1 }}>TOTAL GASTOS MES</div>
+                  <div style={{ color: C.mid, fontSize: 10, letterSpacing: 1 }}>TOTAL GASTOS DEL MES</div>
                   <div style={{ color: C.gold, fontSize: 26, fontWeight: 700 }}>{fmt(totalGastos)}</div>
                   <div style={{ color: C.mid, fontSize: 11 }}>{fmtFull(totalGastos)}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ color: C.mid, fontSize: 10 }}>% sobre ingresos</div>
-                  <div style={{ color: C.cream, fontSize: 22, fontWeight: 700 }}>
-                    {Math.round((totalGastos / kpis.ingresosBrutos) * 100)}%
-                  </div>
+                  <div style={{ color: C.mid, fontSize: 10 }}>Del total de ingresos</div>
+                  <div style={{ color: C.cream, fontSize: 22, fontWeight: 700 }}>{Math.round((totalGastos / kpis.ingresosBrutos) * 100)}%</div>
                 </div>
               </div>
             </div>
 
-            {/* Lista gastos */}
             <div style={{ background: C.white, borderRadius: 12, padding: '4px 14px', marginBottom: 12, border: `1px solid ${C.light}` }}>
-              {gastos.map((g, i) => <GastoRow key={i} {...g} />)}
+              {gastos.map((g, i) => {
+                const colors = { 'Operativo': '#1976d2', 'Mantenimiento': '#f57200', 'Gestión': C.dark, 'Plataforma': '#9c27b0' }
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < gastos.length - 1 ? `1px solid ${C.light}` : 'none' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, color: C.dark }}>{g.concepto}</div>
+                      <span style={{ fontSize: 9, color: colors[g.tipo] || C.muted, background: `${colors[g.tipo]}15`, padding: '1px 6px', borderRadius: 8, marginTop: 2, display: 'inline-block' }}>{g.tipo}</span>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>{fmtFull(g.monto)}</div>
+                  </div>
+                )
+              })}
             </div>
 
-            {/* Resumen cuenta */}
             <div style={{ background: C.white, borderRadius: 12, padding: 14, border: `1px solid ${C.light}` }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Cuenta de resultados</div>
+              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Resumen de tu cuenta del mes</div>
               {[
-                { label: 'Ingresos brutos', value: kpis.ingresosBrutos, positive: true },
-                { label: 'Limpieza y lavandería', value: -680000 },
-                { label: 'Suministros', value: -145000 },
-                { label: 'Mantenimiento', value: -80000 },
-                { label: 'Fee SOLARA', value: -kpis.feeSolara },
-                { label: 'Comisión OTA', value: -277200 },
+                { label: 'Lo que generaron tus huéspedes', value: kpis.ingresosBrutos, sign: '' },
+                { label: 'Limpieza y lavandería', value: -680000, sign: '-' },
+                { label: 'Suministros para huéspedes', value: -145000, sign: '-' },
+                { label: 'Mantenimiento', value: -80000, sign: '-' },
+                { label: 'Comisión de gestión SOLARA', value: -kpis.feeSolara, sign: '-' },
+                { label: 'Comisión Airbnb', value: -277200, sign: '-' },
               ].map((r, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${C.light}` }}>
                   <span style={{ fontSize: 11, color: C.muted }}>{r.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: r.positive ? 700 : 400, color: r.positive ? C.dark : r.value < 0 ? '#e53935' : C.dark }}>
-                    {r.value > 0 ? '' : '-'}{fmtFull(Math.abs(r.value))}
+                  <span style={{ fontSize: 12, fontWeight: i === 0 ? 700 : 400, color: i === 0 ? C.dark : '#e53935' }}>
+                    {r.sign}{fmtFull(Math.abs(r.value))}
                   </span>
                 </div>
               ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: C.dark }}>RESULTADO NETO</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#4caf50' }}>
-                  {fmtFull(kpis.ingresosBrutos - totalGastos)}
-                </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0 0' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.dark }}>💸 LO QUE TE TRANSFERIMOS</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#4caf50' }}>{fmtFull(kpis.ingresosBrutos - totalGastos)}</span>
               </div>
             </div>
           </div>
@@ -469,24 +490,22 @@ export default function OwnerPortal() {
         {/* ── MERCADO ── */}
         {seccion === 'mercado' && (
           <div>
-            <div style={{ fontSize: 16, color: C.dark, marginBottom: 4 }}>Posición en el Mercado</div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>Tu propiedad vs. competencia Manila / El Poblado</div>
+            <div style={{ fontSize: 16, color: C.dark, marginBottom: 4 }}>¿Cómo estás vs el mercado?</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>Tu propiedad comparada con apartamentos similares en Manila / El Poblado</div>
 
-            {/* Comparativa */}
             <div style={{ background: C.white, borderRadius: 12, padding: 14, marginBottom: 12, border: `1px solid ${C.light}` }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 14 }}>Benchmarking competitivo</div>
-              <CompBar label="ADR (precio medio/noche)" tuValor={competencia.tuADR} mercadoValor={competencia.mercadoADR} />
-              <CompBar label="Ocupación (%)" tuValor={competencia.tuOcupacion} mercadoValor={competencia.mercadoOcupacion} isPercent />
-              <CompBar label="RevPAR" tuValor={competencia.tuRevPAR} mercadoValor={competencia.mercadoRevPAR} />
+              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 14 }}>Comparativa con apartamentos similares en tu zona</div>
+              <CompBar label="Precio medio por noche" tuValor={competencia.tuADR} mercadoValor={competencia.mercadoADR} termino="ADR" />
+              <CompBar label="% de noches vendidas" tuValor={competencia.tuOcupacion} mercadoValor={competencia.mercadoOcupacion} isPercent termino="Ocupación" />
+              <CompBar label="Ingreso por noche disponible" tuValor={competencia.tuRevPAR} mercadoValor={competencia.mercadoRevPAR} termino="RevPAR" />
             </div>
 
-            {/* Score card */}
             <div style={{ background: C.dark, borderRadius: 12, padding: 14, marginBottom: 12 }}>
-              <div style={{ color: C.gold, fontSize: 11, fontWeight: 700, marginBottom: 10 }}>✦ SOLARA Performance Score</div>
+              <div style={{ color: C.gold, fontSize: 11, fontWeight: 700, marginBottom: 10 }}>✦ Tu posición en el mercado</div>
               {[
-                { kpi: 'ADR', diff: Math.round(((competencia.tuADR - competencia.mercadoADR) / competencia.mercadoADR) * 100) },
-                { kpi: 'Ocupación', diff: competencia.tuOcupacion - competencia.mercadoOcupacion },
-                { kpi: 'RevPAR', diff: Math.round(((competencia.tuRevPAR - competencia.mercadoRevPAR) / competencia.mercadoRevPAR) * 100) },
+                { kpi: 'Precio medio/noche', diff: Math.round(((competencia.tuADR - competencia.mercadoADR) / competencia.mercadoADR) * 100) },
+                { kpi: 'Noches vendidas', diff: competencia.tuOcupacion - competencia.mercadoOcupacion },
+                { kpi: 'Ingreso/noche disponible', diff: Math.round(((competencia.tuRevPAR - competencia.mercadoRevPAR) / competencia.mercadoRevPAR) * 100) },
               ].map((s, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <span style={{ fontSize: 11, color: C.mid }}>{s.kpi}</span>
@@ -495,22 +514,24 @@ export default function OwnerPortal() {
                   </span>
                 </div>
               ))}
+              <div style={{ background: 'rgba(76,175,80,0.15)', borderRadius: 8, padding: '8px 10px', marginTop: 8 }}>
+                <div style={{ fontSize: 10, color: '#4caf50' }}>✓ Tu propiedad supera al mercado en los 3 indicadores clave</div>
+              </div>
             </div>
 
-            {/* Rating análisis */}
             <div style={{ background: C.white, borderRadius: 12, padding: 14, border: `1px solid ${C.light}` }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Análisis de Reputación</div>
+              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Valoraciones de tus huéspedes</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
                 <div style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 36, fontWeight: 700, color: C.dark }}>{kpis.rating}</div>
-                  <div style={{ fontSize: 9, color: C.muted }}>Rating medio</div>
+                  <div style={{ fontSize: 9, color: C.muted }}>Sobre 5</div>
                 </div>
                 <div style={{ flex: 1 }}>
-                  {[5, 4, 3, 2, 1].map(stars => {
-                    const pct = stars === 5 ? 72 : stars === 4 ? 22 : stars === 3 ? 4 : stars === 2 ? 1 : 1
+                  {[5,4,3,2,1].map(s => {
+                    const pct = s === 5 ? 72 : s === 4 ? 22 : s === 3 ? 4 : 1
                     return (
-                      <div key={stars} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                        <span style={{ fontSize: 9, color: C.muted, width: 8 }}>{stars}</span>
+                      <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <span style={{ fontSize: 9, color: C.muted, width: 8 }}>{s}</span>
                         <span style={{ fontSize: 9 }}>⭐</span>
                         <div style={{ flex: 1, background: C.light, borderRadius: 3, height: 5 }}>
                           <div style={{ width: `${pct}%`, background: C.gold, height: 5, borderRadius: 3 }} />
@@ -521,11 +542,11 @@ export default function OwnerPortal() {
                   })}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {[{ cat: 'Limpieza', val: 4.9 }, { cat: 'Ubicación', val: 4.8 }, { cat: 'Valor', val: 4.7 }, { cat: 'Check-in', val: 5.0 }].map((r, i) => (
-                  <div key={i} style={{ flex: 1, textAlign: 'center', background: C.cream, borderRadius: 8, padding: '8px 4px' }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>{r.val}</div>
-                    <div style={{ fontSize: 8, color: C.muted }}>{r.cat}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {[{ cat: 'Limpieza', val: 4.9 }, { cat: 'Ubicación', val: 4.8 }, { cat: 'Valor percibido', val: 4.7 }, { cat: 'Proceso de llegada', val: 5.0 }].map((r, i) => (
+                  <div key={i} style={{ background: C.cream, borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: C.dark }}>{r.val}</div>
+                    <div style={{ fontSize: 9, color: C.muted }}>{r.cat}</div>
                   </div>
                 ))}
               </div>
@@ -536,16 +557,16 @@ export default function OwnerPortal() {
         {/* ── PROYECCIÓN ── */}
         {seccion === 'proyeccion' && (
           <div>
-            <div style={{ fontSize: 16, color: C.dark, marginBottom: 4 }}>Proyección</div>
-            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>{proyeccion.mes} — Estimación SOLARA</div>
+            <div style={{ fontSize: 16, color: C.dark, marginBottom: 4 }}>Qué esperar el próximo mes</div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 16 }}>{proyeccion.mes} — estimación basada en datos de mercado</div>
 
             <div style={{ background: C.dark, borderRadius: 14, padding: 18, marginBottom: 12 }}>
               <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2, marginBottom: 12 }}>ESTIMACIÓN {proyeccion.mes.toUpperCase()}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
                 {[
                   { label: 'Ingresos estimados', value: fmt(proyeccion.ingresosBrutos), sub: fmtFull(proyeccion.ingresosBrutos) },
-                  { label: 'Ocupación est.', value: `${proyeccion.ocupacionEst}%`, sub: 'proyectado' },
-                  { label: 'ADR estimado', value: fmt(proyeccion.adrEst), sub: '/noche' },
+                  { label: 'Noches vendidas est.', value: `${proyeccion.ocupacionEst}%`, sub: 'de ocupación' },
+                  { label: 'Precio medio est.', value: fmt(proyeccion.adrEst), sub: '/noche' },
                 ].map((k, i) => (
                   <div key={i} style={{ textAlign: 'center' }}>
                     <div style={{ color: C.gold, fontSize: 18, fontWeight: 700 }}>{k.value}</div>
@@ -555,7 +576,7 @@ export default function OwnerPortal() {
                 ))}
               </div>
               <div style={{ borderTop: `1px solid rgba(255,255,255,0.1)`, paddingTop: 12 }}>
-                <div style={{ color: C.mid, fontSize: 10, marginBottom: 6 }}>📅 EVENTOS RELEVANTES</div>
+                <div style={{ color: C.mid, fontSize: 10, marginBottom: 6 }}>📅 EVENTOS QUE AFECTAN A TUS PRECIOS</div>
                 {proyeccion.eventosDestacados.map((e, i) => (
                   <div key={i} style={{ color: C.light, fontSize: 11, marginBottom: 4, display: 'flex', gap: 8 }}>
                     <span style={{ color: C.gold }}>✦</span>{e}
@@ -564,14 +585,13 @@ export default function OwnerPortal() {
               </div>
             </div>
 
-            {/* Recomendaciones SOLARA */}
             <div style={{ background: C.white, borderRadius: 12, padding: 14, marginBottom: 12, border: `1px solid ${C.light}` }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 10 }}>✦ Recomendaciones SOLARA</div>
+              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 10 }}>Recomendaciones de SOLARA para mayo</div>
               {[
-                { tipo: '💰', titulo: 'Ajuste tarifario mayo', desc: 'Subir ADR a COP 435.000 para aprovechar temporada alta. Fines de semana a COP 510.000.' },
-                { tipo: '📸', titulo: 'Fotografía profesional URGENTE', desc: 'Las fotos actuales limitan el ADR. Con fotografía top podemos subir precio 15–20%.' },
-                { tipo: '❄️', titulo: 'Instalar aire acondicionado', desc: 'Mayo-junio es temporada cálida. El A/C aumenta conversión y permite tarifa premium.' },
-                { tipo: '🎯', titulo: 'Activar canal directo', desc: 'Crear cuenta en Booking.com canal directo para reducir comisiones al 0% vs 3% Airbnb.' },
+                { tipo: '💰', titulo: 'Ajuste de precios recomendado', desc: 'Subir precio medio a 435.000 COP/noche para aprovechar temporada alta. Fines de semana: 510.000 COP.' },
+                { tipo: '📸', titulo: 'Fotografía profesional — URGENTE', desc: 'Las fotos actuales limitan tu precio. Con fotografía top podemos subir tarifas un 15–20% adicional.' },
+                { tipo: '❄️', titulo: 'Instalar aire acondicionado', desc: 'Mayo y junio son meses calurosos. El A/C aumenta reservas y permite cobrar más.' },
+                { tipo: '🎯', titulo: 'Activar canal de reservas directas', desc: 'Reducir dependencia de Airbnb. Cada reserva directa te ahorra la comisión del 3%.' },
               ].map((r, i) => (
                 <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 12, paddingBottom: 12, borderBottom: i < 3 ? `1px solid ${C.light}` : 'none' }}>
                   <span style={{ fontSize: 22, flexShrink: 0 }}>{r.tipo}</span>
@@ -583,22 +603,21 @@ export default function OwnerPortal() {
               ))}
             </div>
 
-            {/* Proyección 3 meses */}
             <div style={{ background: C.white, borderRadius: 12, padding: 14, border: `1px solid ${C.light}` }}>
-              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Proyección 3 meses</div>
+              <div style={{ fontSize: 11, color: C.dark, fontWeight: 600, marginBottom: 12 }}>Previsión para los próximos 3 meses</div>
               {[
                 { mes: 'Mayo 2026', ingresos: 9800000, ocupacion: 75, note: 'Temporada alta' },
                 { mes: 'Junio 2026', ingresos: 8900000, ocupacion: 70, note: 'Festival Tango' },
-                { mes: 'Julio 2026', ingresos: 11200000, ocupacion: 82, note: 'Pre-Feria Flores' },
+                { mes: 'Julio 2026', ingresos: 11200000, ocupacion: 82, note: 'Previa Feria de las Flores' },
               ].map((m, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 2 ? `1px solid ${C.light}` : 'none' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < 2 ? `1px solid ${C.light}` : 'none' }}>
                   <div>
                     <div style={{ fontSize: 12, color: C.dark, fontWeight: 600 }}>{m.mes}</div>
-                    <div style={{ fontSize: 10, color: C.muted }}>{m.note} · {m.ocupacion}% ocupación est.</div>
+                    <div style={{ fontSize: 10, color: C.muted }}>{m.note} · {m.ocupacion}% noches vendidas est.</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: C.gold }}>{fmt(m.ingresos)}</div>
-                    <div style={{ fontSize: 9, color: C.muted }}>brutos est.</div>
+                    <div style={{ fontSize: 9, color: C.muted }}>estimado</div>
                   </div>
                 </div>
               ))}
@@ -607,13 +626,16 @@ export default function OwnerPortal() {
         )}
 
       </div>
-
       <style>{`
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 3px; height: 3px; }
         ::-webkit-scrollbar-thumb { background: ${C.light}; border-radius: 10px; }
         button:active { transform: scale(0.97); }
-        select option { background: #2c3027; }
+        @media print {
+          .no-print { display: none !important; }
+          body { background: white !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
       `}</style>
     </div>
   )
