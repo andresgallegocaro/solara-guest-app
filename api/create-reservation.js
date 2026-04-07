@@ -1,4 +1,4 @@
-const NOTION_DB = '201f8d6b-5a24-4289-8d42-4488cd32e293'
+const NOTION_DB = '33bf5763e9c380e98236f2d8751803ac'
 const NOTION_TOKEN = process.env.NOTION_TOKEN
 
 module.exports = async function handler(req, res) {
@@ -11,38 +11,19 @@ module.exports = async function handler(req, res) {
 
   try {
     const r = req.body
-    const guestAppUrl = `https://solara-guest-app.vercel.app/guest?id=${r.id}`
+    const guestAppUrl = 'https://solara-guest-app.vercel.app/guest?id=' + r.id
 
     const notionRes = await fetch('https://api.notion.com/v1/pages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${NOTION_TOKEN}`,
+        'Authorization': 'Bearer ' + NOTION_TOKEN,
         'Notion-Version': '2022-06-28',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         parent: { database_id: NOTION_DB },
         properties: {
-          'ID Reserva':      { title: [{ text: { content: r.id } }] },
-          'Nombre Huésped':  { rich_text: [{ text: { content: r.guestName || '' } }] },
-          'Email':           { email: r.guestEmail || null },
-          'Teléfono':        { phone_number: r.guestPhone || null },
-          'Propiedad':       { select: { name: r.property } },
-          'Zona':            { rich_text: [{ text: { content: r.zone || '' } }] },
-          'Check-in':        { date: { start: r.checkin } },
-          'Check-out':       { date: { start: r.checkout } },
-          'Noches':          { number: r.nights },
-          'Huéspedes':       { number: r.guests },
-          'Código Acceso':   { rich_text: [{ text: { content: r.accessCode || '' } }] },
-          'WiFi Red':        { rich_text: [{ text: { content: r.wifiName || '' } }] },
-          'WiFi Clave':      { rich_text: [{ text: { content: r.wifiPass || '' } }] },
-          'Plataforma':      { select: { name: r.platform } },
-          'ADR COP':         { number: r.adr },
-          'Total COP':       { number: r.total },
-          'Estado':          { select: { name: r.status || 'Confirmada' } },
-          'Check-in Completado': { checkbox: false },
-          'Notas Operativas':{ rich_text: [{ text: { content: r.notes || '' } }] },
-          'Enlace Guest App':{ url: guestAppUrl },
+          'Name': { title: [{ text: { content: r.id + ' | ' + r.guestName + ' | ' + r.property } }] },
         },
       }),
     })
@@ -55,6 +36,7 @@ module.exports = async function handler(req, res) {
       notionPageId: page.id,
       notionUrl: page.url,
       guestAppUrl,
+      reservation: r,
     })
   } catch (err) {
     return res.status(500).json({ error: err.message })
