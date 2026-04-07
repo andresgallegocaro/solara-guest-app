@@ -1,51 +1,39 @@
-const NOTION_DB = '201f8d6b-5a24-4289-8d42-4488cd32e293'
+const NOTION_DB = '33bf5763e9c380e98236f2d8751803ac'
 const NOTION_TOKEN = process.env.NOTION_TOKEN
 
-function mapPage(page) {
-  const p = page.properties
-  const get = (key) => {
-    const prop = p[key]
-    if (!prop) return null
-    if (prop.type === 'title') return prop.title?.[0]?.plain_text || ''
-    if (prop.type === 'rich_text') return prop.rich_text?.[0]?.plain_text || ''
-    if (prop.type === 'email') return prop.email || ''
-    if (prop.type === 'phone_number') return prop.phone_number || ''
-    if (prop.type === 'select') return prop.select?.name || ''
-    if (prop.type === 'number') return prop.number ?? null
-    if (prop.type === 'checkbox') return prop.checkbox ?? false
-    if (prop.type === 'url') return prop.url || ''
-    if (prop.type === 'date') return prop.date?.start || ''
-    return null
-  }
-  const checkin = get('Check-in')
-  const checkout = get('Check-out')
-  let nights = get('Noches')
-  if (!nights && checkin && checkout) {
-    nights = Math.ceil((new Date(checkout) - new Date(checkin)) / 86400000)
-  }
-  return {
-    id: get('ID Reserva'),
-    notionPageId: page.id,
-    guestName: get('Nombre Huésped'),
-    guestEmail: get('Email'),
-    guestPhone: get('Teléfono'),
-    property: get('Propiedad'),
-    zone: get('Zona'),
-    checkin, checkout, nights,
-    guests: get('Huéspedes'),
-    accessCode: get('Código Acceso'),
-    wifiName: get('WiFi Red'),
-    wifiPass: get('WiFi Clave'),
-    platform: get('Plataforma'),
-    adr: get('ADR COP'),
-    total: get('Total COP'),
-    status: get('Estado'),
-    checkinDone: get('Check-in Completado'),
-    notes: get('Notas Operativas'),
-    guestAppUrl: get('Enlace Guest App'),
-    rooms: 3, services: [],
-  }
-}
+// Reservas de fallback mientras la DB real no tiene todos los campos
+const FALLBACK = [
+  {
+    id: 'RES-TEST', notionPageId: '33bf5763e9c38115b0acf4d643df7635',
+    guestName: 'Andi Gallego', guestEmail: 'hola@solarahomes.com.co',
+    guestPhone: '+57 304 616 0294', property: 'SOLARA Manila 1',
+    zone: 'Manila, El Poblado', checkin: '2026-04-05', checkout: '2026-04-08',
+    nights: 3, guests: 2, accessCode: '1450', wifiName: 'SOLARA_Manila1',
+    wifiPass: '(pendiente)', platform: 'Canal directo',
+    adr: 420000, total: 1260000, status: 'Confirmada', checkinDone: false,
+    notes: 'Reserva de prueba. Cocina granito Bosch. 2 balcones. Smart TV.', rooms: 3, services: [],
+  },
+  {
+    id: 'RES-001', notionPageId: '33bf5763e9c38157b2b0daf4f4bb84f3',
+    guestName: 'Carlos Méndez', guestEmail: 'carlos.mendez@email.com',
+    guestPhone: '+57 300 000 0001', property: "Casa d'Artist",
+    zone: 'Provenza, El Poblado', checkin: '2026-04-02', checkout: '2026-04-05',
+    nights: 3, guests: 2, accessCode: '4729', wifiName: 'SOLARA_CasaArtist',
+    wifiPass: 'Arte&Lujo2026', platform: 'Airbnb',
+    adr: 550000, total: 1650000, status: 'En curso', checkinDone: true,
+    notes: 'Huésped corporativo. Llega en vuelo desde Bogotá.', rooms: 3, services: [],
+  },
+  {
+    id: 'RES-002', notionPageId: '33bf5763e9c38156aecdeb01b15a0112',
+    guestName: 'Sarah Johnson', guestEmail: 'sarah.j@company.com',
+    guestPhone: '+1 646 000 0002', property: "Casa d'Artist",
+    zone: 'Provenza, El Poblado', checkin: '2026-04-10', checkout: '2026-04-14',
+    nights: 4, guests: 1, accessCode: '8315', wifiName: 'SOLARA_CasaArtist',
+    wifiPass: 'Arte&Lujo2026', platform: 'Booking.com',
+    adr: 580000, total: 2320000, status: 'Confirmada', checkinDone: false,
+    notes: 'Nómada digital. Solicitar early check-in.', rooms: 3, services: [],
+  },
+]
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -54,48 +42,13 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  if (!NOTION_TOKEN) {
-    return res.status(500).json({ error: 'NOTION_TOKEN not configured' })
-  }
-
   const { id } = req.query
 
-  try {
-    const body = id
-      ? { filter: { property: 'ID Reserva', title: { equals: id } } }
-      : { sorts: [{ property: 'Check-in', direction: 'descending' }] }
-
-    const notionRes = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB}/query`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${NOTION_TOKEN}`,
-        'Notion-Version': '2022-06-28',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
-
-    const data = await notionRes.json()
-
-    if (!notionRes.ok) {
-      return res.status(notionRes.status).json({
-        error: data.message || 'Notion API error',
-        code: data.code,
-      })
-    }
-
-    if (!data.results) {
-      return res.status(500).json({ error: 'No results from Notion', raw: data })
-    }
-
-    if (id) {
-      if (!data.results.length) return res.status(404).json({ error: `Reserva ${id} no encontrada` })
-      return res.status(200).json(mapPage(data.results[0]))
-    }
-
-    return res.status(200).json(data.results.map(mapPage))
-
-  } catch (err) {
-    return res.status(500).json({ error: err.message })
+  if (id) {
+    const found = FALLBACK.find(r => r.id === id)
+    if (found) return res.status(200).json(found)
+    return res.status(404).json({ error: 'Reserva no encontrada' })
   }
+
+  return res.status(200).json(FALLBACK)
 }
