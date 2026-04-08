@@ -5,7 +5,8 @@ import Home from './pages/Home'
 import GuestApp from './pages/GuestApp'
 import AdminPanel from './pages/AdminPanel'
 import OwnerPortal from './pages/OwnerPortal'
-import LoyaltySystem from '../LoyaltySystem'
+import LoyaltySystem from './LoyaltySystem'
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
