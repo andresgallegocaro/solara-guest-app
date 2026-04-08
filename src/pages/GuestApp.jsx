@@ -462,7 +462,11 @@ export default function GuestApp() {
                 ))}
               </div>
             </div>
-
+<div onClick={() => window.location.href = '/guest/loyalty'} style={{ cursor: 'pointer', background: '#47523e', color: '#fff', borderRadius: 12, padding: '16px 18px', marginTop: 12 }}>
+          <p style={{ fontSize: 10, color: '#919c89', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 1 }}>SOLARA Loyalty</p>
+          <p style={{ fontSize: 17, fontWeight: 500, margin: '0 0 2px' }}>◆ Silver · 820 puntos</p>
+          <p style={{ fontSize: 12, color: '#919c89', margin: 0 }}>Ver recompensas y mi progreso →</p>
+        </div>
             <div style={{ margin: '12px 18px 0', background: C.white, borderRadius: 12, padding: '14px 16px', border: `1px solid ${C.light}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>Check-in Online</span>
