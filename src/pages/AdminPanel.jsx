@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import PricingEngine from '../PricingEngine'
 import { C, DEMO_RESERVATIONS, PROPERTIES, PLATFORMS, STATUSES, STATUS_META } from '../config'
 import { createReservationInNotion } from '../api'
 
@@ -309,7 +310,7 @@ export default function AdminPanel() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 4, marginTop: 12 }}>
-          {[['dashboard', '📊 Dashboard'], ['list', '📋 Reservas']].map(([v, label]) => (
+          {[['dashboard', '📊 Dashboard'], ['list', '📋 Reservas'], ['pricing', '📈 Pricing']].map(([v, label]) => (
             <button key={v} onClick={() => setView(v)} style={{ background: view === v ? 'rgba(201,168,76,0.2)' : 'transparent', color: view === v ? C.gold : C.mid, border: `1px solid ${view === v ? C.gold : 'transparent'}`, borderRadius: 20, padding: '5px 14px', cursor: 'pointer', fontSize: 11, fontWeight: view === v ? 700 : 400 }}>
               {label}
             </button>
@@ -318,7 +319,7 @@ export default function AdminPanel() {
       </div>
 
       <div style={{ padding: '16px 16px 24px' }}>
-
+{view === 'pricing' && <PricingEngine />}
         {view === 'dashboard' && (
           <>
             <div style={{ background: C.white, borderRadius: 10, padding: '10px 14px', border: `1px solid ${C.light}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
